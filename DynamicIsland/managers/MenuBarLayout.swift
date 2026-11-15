@@ -32,6 +32,10 @@ final class MenuBarLayout: ObservableObject {
     /// treat that as "no constraint" rather than guessing.
     @Published private(set) var appMenusRightEdge: CGFloat?
 
+    /// Frames of the status items in the menu bar (accessibility coordinates:
+    /// origin top-left of the primary display). Empty when none could be read.
+    @Published private(set) var statusItemFrames: [CGRect] = []
+
     /// Menus change with the frontmost app, and within an app as its windows
     /// change, so a slow poll backs up the activation notice. It runs only
     /// while something actually needs the measurement.
@@ -50,18 +54,121 @@ final class MenuBarLayout: ObservableObject {
     /// Zero when nothing is covered. Capped at the room remaining on the right,
     /// because a shift that pushes the content off the far edge has traded one
     /// covered thing for another.
+    ///
+    /// The right-hand side is the status items -- clock, Wi-Fi, the menu bar's
+    /// own overflow chevron -- which macOS lays out from the notch outward just
+    /// as it does the app's menus. Content wide enough to reach them moves left
+    /// instead. When both sides are covered and there is no position that
+    /// clears both, the overlap is split between them rather than one side
+    /// being buried entirely.
     nonisolated static func clearanceOffset(
         contentWidth: CGFloat,
         screenFrame: CGRect,
-        menusRightEdge: CGFloat,
+        menusRightEdge: CGFloat?,
+        statusItemsLeftEdge: CGFloat? = nil,
         gap: CGFloat
     ) -> CGFloat {
         guard contentWidth > 0 else { return 0 }
         let contentLeftEdge = screenFrame.midX - contentWidth / 2
-        let overlap = (menusRightEdge + gap) - contentLeftEdge
-        guard overlap > 0 else { return 0 }
-        let rightHeadroom = max(0, screenFrame.maxX - (contentLeftEdge + contentWidth))
-        return min(overlap, rightHeadroom)
+        let contentRightEdge = contentLeftEdge + contentWidth
+        let rightHeadroom = max(0, screenFrame.maxX - contentRightEdge)
+        let leftHeadroom = max(0, contentLeftEdge - screenFrame.minX)
+
+        // The smallest shift that clears the app's menus, and the largest that
+        // still clears the status items. Positive is rightward.
+        let lowest = menusRightEdge.map { ($0 + gap) - contentLeftEdge }
+        let highest = statusItemsLeftEdge.map { ($0 - gap) - contentRightEdge }
+
+        let shift: CGFloat
+        switch (lowest, highest) {
+        case (nil, nil):
+            return 0
+        case (let lowest?, nil):
+            guard lowest > 0 else { return 0 }
+            shift = lowest
+        case (nil, let highest?):
+            guard highest < 0 else { return 0 }
+            shift = highest
+        case (let lowest?, let highest?):
+            if lowest <= highest {
+                // Some position clears both; take the one nearest centre.
+                shift = min(max(0, lowest), highest)
+            } else {
+                shift = (lowest + highest) / 2
+            }
+        }
+        return min(max(shift, -leftHeadroom), rightHeadroom)
+    }
+
+    /// Left edge of the leftmost status item right of centre on `screenFrame`,
+    /// from the frames `refresh()` collected; `nil` when there are none.
+    nonisolated static func statusItemsLeftEdge(
+        in screenFrame: CGRect,
+        frames: [CGRect],
+        primaryScreenHeight: CGFloat
+    ) -> CGFloat? {
+        // Accessibility frames have their origin top-left of the primary
+        // display, screen frames bottom-left. x is the
+        // same in both; the menu bar's top is where they disagree.
+        let menuBarTop = primaryScreenHeight - screenFrame.maxY
+        let edges = frames
+            .filter { abs($0.minY - menuBarTop) <= 2 }
+            .filter { $0.minX >= screenFrame.midX && $0.maxX <= screenFrame.maxX + 1 }
+            .map(\.minX)
+        return edges.min()
+    }
+
+    /// Every app's status items, read from its accessibility "extras" menu
+    /// bar. On current macOS they are not windows of their own -- the menu bar
+    /// agent draws them -- so the window list cannot see them, but each item
+    /// still reports its frame here. That includes the menu bar's own "show
+    /// hidden items" chevron, which sits right against the notch.
+    nonisolated private static func statusItemFrames(pids: [pid_t]) -> [CGRect] {
+        let startedAt = Date()
+        var frames: [CGRect] = []
+        for pid in pids {
+            guard Date().timeIntervalSince(startedAt) < scanDeadline else { break }
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, extrasTimeout)
+
+            var barValue: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(app, "AXExtrasMenuBar" as CFString, &barValue) == .success,
+                  CFGetTypeID(barValue) == AXUIElementGetTypeID()
+            else { continue }
+            let bar = unsafeBitCast(barValue, to: AXUIElement.self)
+            AXUIElementSetMessagingTimeout(bar, extrasTimeout)
+
+            var childrenValue: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(bar, kAXChildrenAttribute as CFString, &childrenValue) == .success,
+                  let items = childrenValue as? [AXUIElement]
+            else { continue }
+
+            for item in items {
+                AXUIElementSetMessagingTimeout(item, extrasTimeout)
+                if let frame = frame(of: item), frame.width > 0 {
+                    frames.append(frame)
+                }
+            }
+        }
+        return frames
+    }
+
+    /// Most apps have no extras menu bar and answer at once; one that does not
+    /// answer is skipped quickly rather than holding up the rest.
+    nonisolated private static let extrasTimeout: Float = 0.1
+
+    nonisolated private static func frame(of element: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success
+        else { return nil }
+        var origin = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &origin),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+        else { return nil }
+        return CGRect(origin: origin, size: size)
     }
 
     /// Breathing room between the last menu and the notch content, so they do
@@ -104,28 +211,33 @@ final class MenuBarLayout: ObservableObject {
         pollTimer?.invalidate()
         pollTimer = nil
         appMenusRightEdge = nil
+        statusItemFrames = []
     }
 
     func refresh() {
         guard !inFlight else { return }
         guard AXIsProcessTrusted() else {
             appMenusRightEdge = nil
+            statusItemFrames = []
             return
         }
-        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
-            appMenusRightEdge = nil
-            return
-        }
+        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        // Atoll itself is skipped: accessibility requests to this process are
+        // answered on its own main thread, which the scan should not depend on.
+        let pids = NSWorkspace.shared.runningApplications.map(\.processIdentifier).filter { $0 != ownPID }
 
         // Off the main actor: these are cross-process calls, and an app that has
         // stopped answering would otherwise take the notch's UI down with it.
         inFlight = true
         Task.detached(priority: .utility) {
-            let edge = Self.menusRightEdge(pid: pid)
+            let edge = frontmostPID.flatMap { Self.menusRightEdge(pid: $0) }
+            let frames = Self.statusItemFrames(pids: pids)
             await MainActor.run {
                 self.inFlight = false
                 guard self.trackers > 0 else { return }
                 if self.appMenusRightEdge != edge { self.appMenusRightEdge = edge }
+                if self.statusItemFrames != frames { self.statusItemFrames = frames }
             }
         }
     }

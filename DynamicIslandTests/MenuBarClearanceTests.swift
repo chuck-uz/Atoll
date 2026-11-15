@@ -71,3 +71,58 @@ final class MenuBarClearanceTests: XCTestCase {
         XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2000, screen: external), 0)
     }
 }
+
+/// The right-hand side: status items laid out from the notch outward. Same
+/// 1710pt screen, centre 855.
+final class StatusItemClearanceTests: XCTestCase {
+    private let screen = CGRect(x: 0, y: 0, width: 1710, height: 1107)
+    private let gap: CGFloat = 8
+
+    private func offset(contentWidth: CGFloat, menusEnd: CGFloat? = nil, statusStart: CGFloat?) -> CGFloat {
+        MenuBarLayout.clearanceOffset(
+            contentWidth: contentWidth,
+            screenFrame: screen,
+            menusRightEdge: menusEnd,
+            statusItemsLeftEdge: statusStart,
+            gap: gap
+        )
+    }
+
+    func testStatusItemsClearOfTheContentLeaveItCentred() {
+        // 300pt of content ends at 1005; items from 1100 are well clear.
+        XCTAssertEqual(offset(contentWidth: 300, statusStart: 1100), 0)
+    }
+
+    func testStatusItemsReachingTheContentPushItLeft() {
+        // Content ends at 1005; an item starting at 990 overlaps by 15, plus the gap.
+        XCTAssertEqual(offset(contentWidth: 300, statusStart: 990), -23)
+    }
+
+    func testRoomOnTheLeftIsUsedWhenTheMenusAllowIt() {
+        // Menus end at 600, so the content may move left as far as starting at
+        // 608 (a shift of -97); the items only need -23.
+        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 600, statusStart: 990), -23)
+    }
+
+    func testTheMenusLimitHowFarLeftItCanGo() {
+        // Menus ending at 690 allow no further left than -7 (698 - 705); items
+        // starting at 940 need at least -73 (932 - 1005). No position clears
+        // both, so the overlap is split: (-7 + -73) / 2.
+        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 690, statusStart: 940), -40)
+    }
+
+    func testBothSidesClearMeansNoShift() {
+        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 600, statusStart: 1100), 0)
+    }
+
+    func testOnlyItemsRightOfCentreOnTheMenuBarCount() {
+        let frames = [
+            CGRect(x: 1000, y: 0, width: 30, height: 24),   // status item, right of notch
+            CGRect(x: 1200, y: 0, width: 30, height: 24),
+            CGRect(x: 400, y: 0, width: 30, height: 24),    // left of centre: not a status item here
+            CGRect(x: 950, y: 300, width: 30, height: 24)   // not on the menu bar
+        ]
+        let edge = MenuBarLayout.statusItemsLeftEdge(in: screen, frames: frames, primaryScreenHeight: screen.height)
+        XCTAssertEqual(edge, 1000)
+    }
+}

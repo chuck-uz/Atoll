@@ -1166,14 +1166,22 @@ struct ContentView: View {
         guard vm.notchState == .closed,
               !vm.hideOnClosed,
               closedContentWidth > 0,
-              let menusRightEdge = menuBarLayout.appMenusRightEdge,
               let screenFrame = getScreenFrame(currentScreenName)
         else { return 0 }
+
+        let statusItemsLeftEdge = NSScreen.screens.first.flatMap { primary in
+            MenuBarLayout.statusItemsLeftEdge(
+                in: screenFrame,
+                frames: menuBarLayout.statusItemFrames,
+                primaryScreenHeight: primary.frame.height
+            )
+        }
 
         return MenuBarLayout.clearanceOffset(
             contentWidth: closedContentWidth,
             screenFrame: screenFrame,
-            menusRightEdge: menusRightEdge,
+            menusRightEdge: menuBarLayout.appMenusRightEdge,
+            statusItemsLeftEdge: statusItemsLeftEdge,
             gap: MenuBarLayout.clearanceGap
         )
     }
