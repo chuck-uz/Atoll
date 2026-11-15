@@ -692,6 +692,20 @@ private enum JS {
             return !!row.querySelector('.peer-typing-container, .peer-typing');
         }
 
+        // A chat muted in Telegram stays silent here too. Telegram Web marks
+        // the row itself with `is-muted` (dialogElement.ts) and draws a muted
+        // glyph beside the title; either is taken as muted.
+        function isMuted(row) {
+            return row.classList.contains('is-muted')
+                || !!row.querySelector('.dialog-muted-icon, .tgico-muted');
+        }
+
+        // Telegram still notifies for a mention or a reply to you in a muted
+        // chat, and shows it as an "@" badge on the row; so does this.
+        function hasMention(row) {
+            return !!row.querySelector('.dialog-subtitle-badge-mention');
+        }
+
         // In a group the preview reads "Member: what they said". Telegram marks
         // the member's name as its own element, so the two are separated by
         // structure rather than by looking for a colon -- which would cut a
@@ -731,6 +745,9 @@ private enum JS {
 
                 if (!primed || !previous) continue;
                 if (unread === 0) continue;
+                // Still recorded in `seen` above, so unmuting a chat later
+                // does not replay what arrived while it was muted.
+                if (isMuted(row) && !hasMention(row)) continue;
                 // Either the count went up, or it stayed put while the words
                 // changed -- which is what a second message into an already
                 // unread chat looks like when the badge is capped.
