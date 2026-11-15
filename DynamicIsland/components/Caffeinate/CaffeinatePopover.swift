@@ -63,6 +63,10 @@ struct CaffeinatePopover: View {
             VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                 .cornerRadius(12)
         )
+        // The notch is always dark, but a popover takes the system appearance:
+        // in light mode the HUD material turned grey under text drawn for a
+        // dark background, and the list could not be read.
+        .preferredColorScheme(.dark)
     }
 
     private var header: some View {

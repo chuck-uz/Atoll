@@ -716,11 +716,13 @@ enum CaffeinateDuration: String, CaseIterable, Identifiable, Defaults.Serializab
     var displayName: String {
         switch self {
         case .indefinite: return String(localized: "Until turned off")
-        case .fifteenMinutes: return String(localized: "15 minutes")
-        case .thirtyMinutes: return String(localized: "30 minutes")
-        case .oneHour: return String(localized: "1 hour")
-        case .twoHours: return String(localized: "2 hours")
-        case .fourHours: return String(localized: "4 hours")
+        case .fifteenMinutes, .thirtyMinutes, .oneHour, .twoHours, .fourHours:
+            // Formatted by the system so every language gets its own plural
+            // forms ("2 часа", not a catalogue entry reading "2 часов").
+            let total = Int(self.seconds ?? 0)
+            return Duration.seconds(total).formatted(
+                .units(allowed: [.hours, .minutes], width: .wide)
+            )
         }
     }
 }
