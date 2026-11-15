@@ -125,4 +125,15 @@ final class StatusItemClearanceTests: XCTestCase {
         let edge = MenuBarLayout.statusItemsLeftEdge(in: screen, frames: frames, primaryScreenHeight: screen.height)
         XCTAssertEqual(edge, 1000)
     }
+
+    func testInsetThirdPartyItemsCount() {
+        // Third-party items sit 7.5pt down the bar and are 24pt tall, unlike
+        // the system's full-height ones; the leftmost of either kind wins.
+        let frames = [
+            CGRect(x: 1100, y: 7.5, width: 42, height: 24),
+            CGRect(x: 1225, y: 0, width: 17, height: 39)
+        ]
+        let edge = MenuBarLayout.statusItemsLeftEdge(in: screen, frames: frames, primaryScreenHeight: screen.height)
+        XCTAssertEqual(edge, 1100)
+    }
 }

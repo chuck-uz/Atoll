@@ -45,6 +45,7 @@ final class MenuBarLayout: ObservableObject {
     private var pollTimer: Timer?
     private var trackers = 0
     private var inFlight = false
+    private var loggedUntrusted = false
 
     private init() {}
 
@@ -100,6 +101,10 @@ final class MenuBarLayout: ObservableObject {
         return min(max(shift, -leftHeadroom), rightHeadroom)
     }
 
+    /// Tallest menu bar there is (a notched display's is about 39pt); only
+    /// used to tell menu bar items from anything else the scan returns.
+    nonisolated private static let maxMenuBarHeight: CGFloat = 50
+
     /// Left edge of the leftmost status item right of centre on `screenFrame`,
     /// from the frames `refresh()` collected; `nil` when there are none.
     nonisolated static func statusItemsLeftEdge(
@@ -110,9 +115,13 @@ final class MenuBarLayout: ObservableObject {
         // Accessibility frames have their origin top-left of the primary
         // display, screen frames bottom-left. x is the
         // same in both; the menu bar's top is where they disagree.
+        // Items are not all flush with the top: system ones span the whole
+        // bar, third-party ones are inset (y 7.5, height 24 on a 39pt bar). So
+        // an item counts if its middle falls inside the menu bar's height.
         let menuBarTop = primaryScreenHeight - screenFrame.maxY
+        let menuBarBand = menuBarTop...(menuBarTop + maxMenuBarHeight)
         let edges = frames
-            .filter { abs($0.minY - menuBarTop) <= 2 }
+            .filter { menuBarBand.contains($0.midY) }
             .filter { $0.minX >= screenFrame.midX && $0.maxX <= screenFrame.maxX + 1 }
             .map(\.minX)
         return edges.min()
@@ -217,10 +226,15 @@ final class MenuBarLayout: ObservableObject {
     func refresh() {
         guard !inFlight else { return }
         guard AXIsProcessTrusted() else {
+            if appMenusRightEdge != nil || !statusItemFrames.isEmpty || !loggedUntrusted {
+                Logger.log("MenuBarLayout: no accessibility permission, menu bar not measured", category: .lifecycle)
+                loggedUntrusted = true
+            }
             appMenusRightEdge = nil
             statusItemFrames = []
             return
         }
+        loggedUntrusted = false
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let ownPID = ProcessInfo.processInfo.processIdentifier
         // Atoll itself is skipped: accessibility requests to this process are
@@ -236,6 +250,13 @@ final class MenuBarLayout: ObservableObject {
             await MainActor.run {
                 self.inFlight = false
                 guard self.trackers > 0 else { return }
+                if self.appMenusRightEdge != edge || self.statusItemFrames != frames {
+                    let leftmost = frames.map(\.minX).filter { $0 > 0 }.min()
+                    Logger.log(
+                        "MenuBarLayout: app menus end \(edge.map { "\($0)" } ?? "?"), \(frames.count) status items, leftmost \(leftmost.map { "\($0)" } ?? "?")",
+                        category: .lifecycle
+                    )
+                }
                 if self.appMenusRightEdge != edge { self.appMenusRightEdge = edge }
                 if self.statusItemFrames != frames { self.statusItemFrames = frames }
             }

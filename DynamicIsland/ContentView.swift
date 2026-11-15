@@ -747,6 +747,14 @@ struct ContentView: View {
         let closeGestureLayout = applyConfiguredMainLayoutCloseGesture(to: interactiveLayout)
 
         return closeGestureLayout
+            // Menu-bar clearance moves the whole closed notch -- its black shape
+            // included -- not just the content inside it. Shifting only the
+            // content left the shape where it was, still covering the menus
+            // and status items, with the content clipped against its edge.
+            // A connectivity HUD must remain centred on the physical notch:
+            // its middle transparent lane is what keeps both wings visible.
+            .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
+            .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
             .padding(.bottom, notchBottomPadding)
             .offset(y: shouldHideUntilHover && !isHovering
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
@@ -1177,8 +1185,12 @@ struct ContentView: View {
             )
         }
 
+        // The black shape is the measured content plus the horizontal inset on
+        // each side; it is the shape that covers the menu bar.
+        let shapeWidth = closedContentWidth + notchHorizontalPadding * 2
+
         return MenuBarLayout.clearanceOffset(
-            contentWidth: closedContentWidth,
+            contentWidth: shapeWidth,
             screenFrame: screenFrame,
             menusRightEdge: menuBarLayout.appMenusRightEdge,
             statusItemsLeftEdge: statusItemsLeftEdge,
@@ -1422,12 +1434,6 @@ struct ContentView: View {
               }
               .pinnedLyrics(isVisible: pinnedLyricsVisible,
                   isContentHidden: isSneakPeekVisibleOnCurrentScreen || isConnectivityHUDVisible)
-              // A connectivity HUD must remain centred on the physical notch:
-              // its middle transparent lane is what keeps both wings visible.
-              // Menu-bar clearance would shift that lane underneath the camera
-              // housing and clip one of the two content areas.
-              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
-              .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
               ZStack {
