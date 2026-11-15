@@ -102,7 +102,12 @@ func enabledStandardTabCount() -> Int {
     var count = 0
 
     // Home tab
-    if Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
+    if Defaults[.showStandardMediaControls] || Defaults.homeShowsCalendar || Defaults[.showMirror] {
+        count += 1
+    }
+
+    // Calendar tab
+    if Defaults[.showCalendar] && Defaults[.calendarAsSeparateTab] {
         count += 1
     }
 

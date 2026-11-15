@@ -3188,7 +3188,10 @@ struct Media: View {
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var lockScreenMusicFullscreenArtworkEnabled
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
-    @Default(.showCalendar) private var showCalendar
+    @Default(.showCalendar) private var showCalendarSetting
+    @Default(.calendarAsSeparateTab) private var calendarAsSeparateTab
+    /// Calendar beside the player on Home (not in its own tab).
+    private var showCalendar: Bool { showCalendarSetting && !calendarAsSeparateTab }
     @Default(.enableLyrics) private var enableLyrics
     @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
     @Default(.pinnedLyricContext) private var pinnedLyricContext
@@ -3785,7 +3788,16 @@ struct CalendarSettings: View {
                     Text("Show calendar")
                 }
                 .settingsHighlight(id: highlightID("Show calendar"))
-                if enableLyrics {
+                Defaults.Toggle(key: .calendarAsSeparateTab) {
+                    Text("Show calendar in its own tab")
+                }
+                .disabled(!showCalendar)
+                .settingsHighlight(id: highlightID("Show calendar in its own tab"))
+                Text("The Calendar tab shows a month grid and the next seven days, and Home gives the music player the full width.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if enableLyrics && !Defaults[.calendarAsSeparateTab] {
                     Text("Lyrics are on too, so the two share the notch and lyrics drop to a single line under the artist name.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

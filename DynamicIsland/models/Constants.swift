@@ -981,6 +981,14 @@ enum LockScreenLiveActivityIconStyle: String, Defaults.Serializable {
     var showsFingerprint: Bool { self == .fingerprint || self == .both }
 }
 
+extension Defaults {
+    /// Whether Home shows the calendar beside the player. False when the
+    /// calendar has moved to its own tab.
+    static var homeShowsCalendar: Bool {
+        Defaults[.showCalendar] && !Defaults[.calendarAsSeparateTab]
+    }
+}
+
 extension Defaults.Keys {
         // MARK: General
     static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
@@ -1034,6 +1042,9 @@ extension Defaults.Keys {
     static let animationTransformOverrides = Key<[String: AnimationTransformConfig]>("animationTransformOverrides", default: [:])
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
     static let showCalendar = Key<Bool>("showCalendar", default: true)
+    /// Show the calendar as its own notch tab (with a week agenda) instead of
+    /// beside the music player on Home. Home then gives the player full width.
+    static let calendarAsSeparateTab = Key<Bool>("calendarAsSeparateTab", default: true)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
     static let sliderColor = Key<SliderColorEnum>(

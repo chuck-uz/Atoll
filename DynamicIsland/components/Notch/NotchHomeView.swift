@@ -453,7 +453,10 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
-    @Default(.showCalendar) private var showCalendar
+    @Default(.showCalendar) private var showCalendarSetting
+    @Default(.calendarAsSeparateTab) private var calendarAsSeparateTab
+    /// Calendar beside the player on Home; off when it lives in its own tab.
+    private var showCalendar: Bool { showCalendarSetting && !calendarAsSeparateTab }
     private let seekInterval: TimeInterval = 10
 
     var body: some View {
@@ -896,7 +899,10 @@ struct NotchHomeView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
-    @Default(.showCalendar) private var showCalendar
+    @Default(.showCalendar) private var showCalendarSetting
+    @Default(.calendarAsSeparateTab) private var calendarAsSeparateTab
+    /// Calendar beside the player on Home; off when it lives in its own tab.
+    private var showCalendar: Bool { showCalendarSetting && !calendarAsSeparateTab }
     @Default(.enableLyrics) private var enableLyrics
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset

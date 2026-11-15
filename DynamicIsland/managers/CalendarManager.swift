@@ -39,6 +39,7 @@ class CalendarManager: ObservableObject {
     @Published var calendarAuthorizationStatus: EKAuthorizationStatus = .notDetermined
     @Published var reminderAuthorizationStatus: EKAuthorizationStatus = .notDetermined
     @Published var lockScreenEvents: [EventModel] = []
+    @Published var agendaEvents: [EventModel] = []
 
     private var lockScreenPreviewEvents: [EventModel]?
 
@@ -354,6 +355,26 @@ class CalendarManager: ObservableObject {
                 guard self.hasCalendarAccess else { continue }
                 await self.updateLockScreenEvents(force: false)
             }
+        }
+    }
+
+    /// Fetches events for `days` days starting at the start of `date` into
+    /// `agendaEvents`, for the Calendar tab's week agenda. Kept apart from
+    /// `events`, which follows the single day selected in the Home calendar.
+    func updateAgenda(from date: Date = Date(), days: Int = 7) async {
+        let calendar = Calendar.current
+        let startDate = calendar.startOfDay(for: date)
+        guard let endDate = calendar.date(byAdding: .day, value: days, to: startDate) else { return }
+        let calendarIDs = selectedCalendars.map { $0.id }
+        let service = calendarService
+
+        let fetched = await eventFetchLimiter.run {
+            await service.events(from: startDate, to: endDate, calendars: calendarIDs)
+        }
+
+        agendaEvents = fetched.sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return lhs.isAllDay && !rhs.isAllDay
         }
     }
 

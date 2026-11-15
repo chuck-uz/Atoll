@@ -57,6 +57,7 @@ struct TabSelectionView: View {
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
     @Default(.showCalendar) private var showCalendar
+    @Default(.calendarAsSeparateTab) private var calendarAsSeparateTab
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
@@ -67,6 +68,10 @@ struct TabSelectionView: View {
 
         if homeTabVisible {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
+        }
+
+        if calendarTabVisible {
+            tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
         }
 
         if Defaults[.dynamicShelf] {
@@ -163,7 +168,11 @@ struct TabSelectionView: View {
         if enableMinimalisticUI {
             return true
         }
-        return showStandardMediaControls || showCalendar || showMirror
+        return showStandardMediaControls || (showCalendar && !calendarAsSeparateTab) || showMirror
+    }
+
+    private var calendarTabVisible: Bool {
+        !enableMinimalisticUI && showCalendar && calendarAsSeparateTab
     }
 
     private func isSelected(_ tab: TabModel) -> Bool {
