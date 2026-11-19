@@ -120,9 +120,24 @@ private struct ScrollMonitor: NSViewRepresentable {
         private func handleScroll(_ event: NSEvent) {
             guard lastEventTimestamp != event.timestamp else { return }
             lastEventTimestamp = event.timestamp
+
+            // The end of a gesture is honoured wherever the cursor is. Checking
+            // the position first dropped the end of any swipe finished off the
+            // notch, and whoever was tracking the gesture never heard it stop --
+            // the open notch stayed blurred by a half-finished close gesture.
+            // A cancelled gesture is an ended one as far as anyone here cares.
+            let isEnd = event.phase == .ended || event.phase == .cancelled
+                || event.momentumPhase == .ended || event.momentumPhase == .cancelled
+            if isEnd && active {
+                action(accumulated.magnitude, .ended)
+                active = false
+                accumulated = 0
+                return
+            }
+
             guard isCursorNearObservedView(using: event) else { return }
 
-            if event.phase == .ended || event.momentumPhase == .ended {
+            if isEnd {
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {

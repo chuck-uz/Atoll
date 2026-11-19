@@ -1145,6 +1145,13 @@ struct ContentView: View {
                 if vm.notchState == .closed { menuBarLayout.startTracking() }
             }
             .onChange(of: vm.notchState) { _, state in
+                // A gesture never carries over from one state to the next. If its
+                // end was missed, what remained of it blurred the newly opened
+                // notch until the next swipe.
+                if gestureProgress != .zero {
+                    withAnimation(.smooth) { gestureProgress = .zero }
+                }
+
                 // An open notch covers the menu bar wholesale and is the user's
                 // own doing, so there is nothing to step around while it is up.
                 if state == .closed {
