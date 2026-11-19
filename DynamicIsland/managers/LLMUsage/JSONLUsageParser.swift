@@ -127,6 +127,17 @@ struct JSONLUsageParser {
         return modified >= cutoff
     }
 
+    /// Byte patterns a line must contain to be worth decoding: Claude's usage
+    /// block, or the two Codex record types `parseLine` reads.
+    private static let usageMarkers: [Data] = ["\"usage\"", "token_count", "turn_context"].map { Data($0.utf8) }
+
+    /// Most lines are message text and tool output with no token counts at all.
+    /// A byte search rejects them without building a String or a JSON object,
+    /// which is most of the work of a full scan.
+    private static func mayCarryUsage(_ line: Data) -> Bool {
+        usageMarkers.contains { line.range(of: $0) != nil }
+    }
+
     /// Stream a JSONL file line by line, calling `process` for each valid record.
     /// Avoids loading the entire file into memory.
     private static func streamLines(
@@ -174,42 +185,52 @@ struct JSONLUsageParser {
             processRecord(rec)
         }
 
-        while true {
-            let chunk = handle.readData(ofLength: chunkSize)
-            if chunk.isEmpty { break }
-            buffer.append(chunk)
+        // Each chunk is read and parsed inside its own autorelease pool. The data
+        // FileHandle returns and the objects JSONSerialization builds are
+        // autoreleased, and on a background task the outer pool only drains when
+        // the whole scan is over -- so a week of logs (close to a gigabyte here)
+        // sat in memory at once and pushed Atoll past its memory limit.
+        var reachedEnd = false
+        while !reachedEnd {
+            autoreleasepool {
+                let chunk = handle.readData(ofLength: chunkSize)
+                if chunk.isEmpty { reachedEnd = true; return }
+                buffer.append(chunk)
 
-            // Process complete lines from buffer
-            while let newlineRange = buffer.firstIndex(of: UInt8(ascii: "\n")) {
-                let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange)
-                buffer.removeSubrange(buffer.startIndex...newlineRange)
+                // Process complete lines from buffer
+                while let newlineRange = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                    let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange)
+                    buffer.removeSubrange(buffer.startIndex...newlineRange)
 
-                if discardingOversized {
-                    // We were discarding an oversized record; this newline ends it.
-                    discardingOversized = false
-                    continue
+                    if discardingOversized {
+                        // We were discarding an oversized record; this newline ends it.
+                        discardingOversized = false
+                        continue
+                    }
+
+                    // Skip oversized terminated records before decoding
+                    if lineData.count > maxRecordSize {
+                        continue
+                    }
+
+                    guard mayCarryUsage(lineData),
+                          let line = String(data: lineData, encoding: .utf8) else { continue }
+                    processLine(line)
                 }
 
-                // Skip oversized terminated records before decoding
-                if lineData.count > maxRecordSize {
-                    continue
+                // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,
+                // discard data up to the next newline when it arrives
+                if buffer.count > maxRecordSize {
+                    discardingOversized = true
+                    buffer.removeFirst(buffer.count - maxRecordSize)
                 }
-
-                guard let line = String(data: lineData, encoding: .utf8) else { continue }
-                processLine(line)
-            }
-
-            // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,
-            // discard data up to the next newline when it arrives
-            if buffer.count > maxRecordSize {
-                discardingOversized = true
-                buffer.removeFirst(buffer.count - maxRecordSize)
             }
         }
 
         // Process any remaining data in buffer (last line without trailing newline)
         // but only if it's within the size limit and we're not discarding
         if !buffer.isEmpty && buffer.count <= maxRecordSize && !discardingOversized,
+           mayCarryUsage(buffer),
            let line = String(data: buffer, encoding: .utf8) {
             processLine(line)
         }
