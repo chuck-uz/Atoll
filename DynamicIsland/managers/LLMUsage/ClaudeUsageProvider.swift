@@ -1,3 +1,4 @@
+import Defaults
 import Foundation
 
 struct ClaudeUsageProvider: UsageProvider {
@@ -17,9 +18,12 @@ struct ClaudeUsageProvider: UsageProvider {
         let files = jsonlFiles(under: root)
         guard !files.isEmpty else { throw UsageError.notFound("No Claude usage logs found") }
         var snapshot = JSONLUsageParser.aggregate(files: files, now: now)
-        let quota = await quotaClient.fetchLimits()
-        snapshot.sessionLimit = quota.session
-        snapshot.weekLimit = quota.week
+        // The quota needs Claude Code's credentials; leave them alone unless asked.
+        if Defaults[.enableClaudeQuota] {
+            let quota = await quotaClient.fetchLimits()
+            snapshot.sessionLimit = quota.session
+            snapshot.weekLimit = quota.week
+        }
         snapshot.plan = Self.readPlanLabel()
         return snapshot
     }

@@ -8075,6 +8075,16 @@ struct StatsSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Claude Provider"))
 
+                    Defaults.Toggle(key: .enableClaudeQuota) {
+                        Text("Claude limits (5-hour and weekly)")
+                    }
+                    .disabled(!Defaults[.enableClaudeProvider])
+                    .settingsHighlight(id: highlightID("Claude limits"))
+                    Text("Reads Claude Code's sign-in token from the Keychain and sends it to Anthropic to fetch your limits. When the token has expired Atoll may refresh it and write the new one back. Off: tokens and cost come from the local logs in ~/.claude only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
                     Defaults.Toggle(key: .enableCodexProvider) {
                         Text("Codex")
                     }

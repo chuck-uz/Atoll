@@ -1295,6 +1295,11 @@ extension Defaults.Keys {
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)
     static let enableLLMUsageFeature = Key<Bool>("enableLLMUsageFeature", default: false)
     static let enableClaudeProvider = Key<Bool>("enableClaudeProvider", default: true)
+    /// Fetch Claude's 5-hour and weekly limits. Off by default: it reads Claude
+    /// Code's OAuth token from the Keychain, sends it to Anthropic's usage
+    /// endpoint, and may refresh and rewrite that token when it has expired.
+    /// With it off the Claude card uses only the local logs in ~/.claude.
+    static let enableClaudeQuota = Key<Bool>("enableClaudeQuota", default: false)
     static let enableCodexProvider = Key<Bool>("enableCodexProvider", default: true)
     static let enableCursorProvider = Key<Bool>("enableCursorProvider", default: true)
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)

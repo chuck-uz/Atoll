@@ -136,6 +136,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Usage tab
+    if Defaults[.enableLLMUsageFeature] {
+        count += 1
+    }
+
     return count
 }
 

@@ -108,7 +108,11 @@ struct NotchLLMUsageView: View {
                     window("Week", snap.week)
                     window("Session", snap.session)
                 }
-                Text("quota unavailable").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
+                // Claude's limits are off unless asked for; that is a choice,
+                // not a failure, so it is not reported as one.
+                if !(provider == .claude && !Defaults[.enableClaudeQuota]) {
+                    Text("quota unavailable").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
+                }
             } else {
                 if provider == .cursor {
                     if let limit = snap.sessionLimit { quotaGauge("Cursor Models", limit) }

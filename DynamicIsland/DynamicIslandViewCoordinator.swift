@@ -303,6 +303,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.showStandardMediaControls).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showCalendar).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.calendarAsSeparateTab).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.enableLLMUsageFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showMirror).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.dynamicShelf).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTimerFeature).map { _ in () }.eraseToAnyPublisher(),
