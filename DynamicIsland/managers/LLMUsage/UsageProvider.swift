@@ -48,6 +48,13 @@ struct ModelUsage: Equatable, Identifiable {
     }
 }
 
+/// One calendar day's usage, for the week-by-day chart.
+struct DailyUsage: Equatable, Identifiable {
+    let day: Date // start of the day, local time
+    var totals: UsageTotals = .init()
+    var id: Date { day }
+}
+
 struct UsageLimit: Equatable {
     let used: Double
     let limit: Double
@@ -62,6 +69,7 @@ struct UsageSnapshot: Equatable {
     var sessionLimit: UsageLimit? = nil // 5h window quota
     var weekLimit: UsageLimit? = nil // 7d window quota
     var models: [ModelUsage] = []
+    var days: [DailyUsage] = [] // the last seven calendar days, oldest first; filled by the JSONL parser
     var plan: String? = nil // Subscription plan label (e.g. "Max 5x"); provided by Claude only, nil otherwise.
     var newAPIAccounts: [NewAPIAccountSnapshot] = []
     var lastUpdated: Date = .distantPast

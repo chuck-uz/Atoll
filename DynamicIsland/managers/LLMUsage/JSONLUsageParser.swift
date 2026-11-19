@@ -173,6 +173,10 @@ struct JSONLUsageParser {
             }
             add(&snapshot.week)
             if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
+            let recordDay = cal.startOfDay(for: rec.timestamp)
+            if let index = snapshot.days.firstIndex(where: { $0.day == recordDay }) {
+                add(&snapshot.days[index].totals)
+            }
             if rec.timestamp >= sessionStart { add(&snapshot.session) }
             var mt = perModel[rec.model] ?? UsageTotals()
             add(&mt)
@@ -238,6 +242,11 @@ struct JSONLUsageParser {
 
     static func aggregate(files: [URL], now: Date) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: now)
+        snapshot.days = (0..<7).reversed().compactMap { offset in
+            cal.date(byAdding: .day, value: -offset, to: today).map { DailyUsage(day: $0) }
+        }
         var perModel: [String: UsageTotals] = [:]
         var seen = Set<String>()
         let sessionStart = now.addingTimeInterval(-5 * 3600)

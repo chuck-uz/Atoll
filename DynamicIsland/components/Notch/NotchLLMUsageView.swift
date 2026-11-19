@@ -48,6 +48,17 @@ struct NotchLLMUsageView: View {
 
     @ViewBuilder
     private func card(for provider: ProviderID) -> some View {
+        if provider == .claude {
+            ClaudeUsageCard(result: manager.results[.claude] ?? .loading)
+                .padding(10)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        } else {
+            standardCard(for: provider)
+        }
+    }
+
+    @ViewBuilder
+    private func standardCard(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(provider.displayName)
